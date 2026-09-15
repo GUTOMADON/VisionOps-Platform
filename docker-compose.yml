@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: visionops_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-visionops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-visionops}
+      POSTGRES_DB: ${POSTGRES_DB:-visionops}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visionops} -d ${POSTGRES_DB:-visionops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - visionops_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: visionops_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-visionops}:${POSTGRES_PASSWORD:-visionops}@db:5432/${POSTGRES_DB:-visionops}
+      MODEL_PATH: ${MODEL_PATH:-/app/models/visionops_ppe.pt}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.35}
+      DEVICE: ${DEVICE:-cpu}
+      MEDIA_STORAGE_DIR: /app/media
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
+      VIDEO_FRAME_SAMPLE_RATE: ${VIDEO_FRAME_SAMPLE_RATE:-5}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./ml/models:/app/models:ro
+      - backend_media:/app/media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - visionops_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+    container_name: visionops_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - visionops_network
+
+networks:
+  visionops_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  backend_media:

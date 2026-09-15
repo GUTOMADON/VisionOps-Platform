@@ -1,0 +1,46 @@
+# Environment files
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+
+# ML artifacts (large binary files, not committed; see ml/README.md)
+ml/data/
+ml/runs/
+ml/*.pt
+ml/**/*.pt
+ml/**/*.onnx
+!ml/models/.gitkeep
+
+# Backend media uploads
+backend/media/
+media/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/terraform.tfvars
+infra/terraform/crash.log
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
